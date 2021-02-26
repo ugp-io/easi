@@ -11,14 +11,16 @@ import(
 	"github.com/jszwec/csvutil"
 )
 
-type Standard850 struct{
-	Transaction Standard850Transaction
-	LineItems []Standard850LineItem
-	OtherCharges []Standard850OtherCharge
-	Trailer Standard850Trailer
+type Standard850V1 struct{
+	EnvelopeHeaderV2 EnvelopeHeaderV2
+	Transaction Standard850V1Transaction
+	LineItems []Standard850V1LineItem
+	OtherCharges []Standard850V1OtherCharge
+	Trailer Standard850V1Trailer
+	EnvelopeTrailerV2 EnvelopeTrailerV2
 }
 
-type Standard850Transaction struct {
+type Standard850V1Transaction struct {
 	Header string
 	TransactionType string
 	TransactionSetPurpose string
@@ -32,7 +34,6 @@ type Standard850Transaction struct {
 	CurrencyCode string
 	PurchaserAccountID string
 	StoreID string
-	DistributionCenterID string
 	VendorID string
 	ContactNameNumber string
 	FOBPaymentInstructions string
@@ -59,23 +60,24 @@ type Standard850Transaction struct {
 	DropShipCode string
 	SpecialDeliveryInstructions string
 	SpecialOrderInstructions string
-	DeliverToCountyProvinceTownTerritory string
-	PromotionalCode string
-	DeliveryServiceLevel string
-	DeliverToReceiversPhoneNumber string
-	CustomerPONumber string
-	CODForMerchandise string
-	ReceiversEmailAddress string
-	AccountNumber string 
-	NameOfAccount string
-	TrackingID string
-	PurchasersAccountID string
-	DeliverToCommercialOrResidentialSite string
-	CODTagsIndicator string
-	ThirdPartyAccountNumber string
+	
+	// DeliverToCountyProvinceTownTerritory string
+	// PromotionalCode string
+	// DeliveryServiceLevel string
+	// DeliverToReceiversPhoneNumber string
+	// CustomerPONumber string
+	// CODForMerchandise string
+	// ReceiversEmailAddress string
+	// AccountNumber string 
+	// NameOfAccount string
+	// TrackingID string
+	// PurchasersAccountID string
+	// DeliverToCommercialOrResidentialSite string
+	// CODTagsIndicator string
+	// ThirdPartyAccountNumber string
 }
 
-type Standard850LineItem struct {
+type Standard850V1LineItem struct {
 	DetailSectionLoopA string
 	LineItemNumber int
 	ItemIdentificationGTIN string
@@ -90,33 +92,40 @@ type Standard850LineItem struct {
 	TotalMonetaryAmountOfLineItemFormatted string
 }
 
-type Standard850OtherCharge struct {
+type Standard850V1OtherCharge struct {
 	OtherChargesRecord string
 	LineItemNumberForOtherCharges int
 	OtherChargeDescription string
-	OtherChargeAmount int
+	OtherChargeAmount int `csv:"-"`
 	OtherChargeAmountFormatted string
 }
 
-type Standard850Trailer struct {
+type Standard850V1Trailer struct {
 	TrailerRecord string
 	RecordCount int
 	TotalQuantityOrdered int
-	TotalMonetaryValue int `csv:"-"`
-	TotalMonetaryValueFormatted string
-	TotalMonetaryValueOfOtherCharges int `csv:"-"`
-	TotalMonetaryValueOfOtherChargesFormatted string
-	NumberOfCases int
-	PurchaseOrderTotalAmount int `csv:"-"`
-	PurchaseOrderTotalAmountFormatted string
+	// TotalMonetaryValue int `csv:"-"`
+	// TotalMonetaryValueFormatted string
+	// TotalMonetaryValueOfOtherCharges int `csv:"-"`
+	// TotalMonetaryValueOfOtherChargesFormatted string
+	// NumberOfCases int
+	// PurchaseOrderTotalAmount int `csv:"-"`
+	// PurchaseOrderTotalAmountFormatted string
 }
 
-func (s *Standard850) Prep(ctx context.Context) (error){
+func (s *Standard850V1) Prep(ctx context.Context) (error){
+
+	// Header
+	errHeader := s.EnvelopeHeaderV2.Prep(ctx)
+	if errHeader != nil {
+		return errHeader
+	}
+	s.EnvelopeHeaderV2.TransactionType = "850"
 
 	// Transaction
 	s.Transaction.Header = "01"
 	s.Transaction.TransactionType = "850"
-	s.Transaction.VersionNumber = "4.0"
+	s.Transaction.VersionNumber = "1.0"
 	s.Transaction.PODate = time.Now().Format("20060102")
 
 	// Line Items
@@ -135,7 +144,7 @@ func (s *Standard850) Prep(ctx context.Context) (error){
 	var totalMonetaryValueOfOtherCharges int
 	for otherChargeKey, otherCharge := range s.OtherCharges {
 		s.OtherCharges[otherChargeKey].OtherChargesRecord = "06"
-		s.OtherCharges[otherChargeKey].LineItemNumberForOtherCharges = otherChargeKey + 1
+		s.OtherCharges[otherChargeKey].LineItemNumberForOtherCharges = otherChargeKey + 1 + 10
 		s.OtherCharges[otherChargeKey].OtherChargeAmountFormatted = fmt.Sprintf("%.4f", float64(otherCharge.OtherChargeAmount) / 100)
 		totalMonetaryValueOfOtherCharges += otherCharge.OtherChargeAmount
 	}
@@ -144,16 +153,22 @@ func (s *Standard850) Prep(ctx context.Context) (error){
 	s.Trailer.TrailerRecord = "09"
 	s.Trailer.RecordCount = len(s.LineItems)
 	s.Trailer.TotalQuantityOrdered = totalQuantityOrdered
-	s.Trailer.TotalMonetaryValueFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValue) / 100)
-	s.Trailer.TotalMonetaryValueOfOtherChargesFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValueOfOtherCharges) / 100)
-	s.Trailer.PurchaseOrderTotalAmountFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValue + totalMonetaryValueOfOtherCharges) / 100)
+	// s.Trailer.TotalMonetaryValueFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValue) / 100)
+	// s.Trailer.TotalMonetaryValueOfOtherChargesFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValueOfOtherCharges) / 100)
+	// s.Trailer.PurchaseOrderTotalAmountFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValue + totalMonetaryValueOfOtherCharges) / 100)
+
+	// Trailer
+	errTrailer := s.EnvelopeTrailerV2.Prep(ctx)
+	if errTrailer != nil {
+		return errTrailer
+	}
 
 	return nil
 }
 
 
 
-func (s *Standard850) ToBytes(ctx context.Context) (*[]byte, error){
+func (s *Standard850V1) ToBytes(ctx context.Context) (*[]byte, error){
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -171,6 +186,12 @@ func (s *Standard850) ToBytes(ctx context.Context) (*[]byte, error){
 	errHeader := enc.EncodeHeader(header{})
 	if errHeader != nil {
 		return nil, errHeader
+	}
+
+	// Envelope Header
+	errEnvelopeHeaderV2 := enc.Encode(s.EnvelopeHeaderV2)
+	if errEnvelopeHeaderV2 != nil {
+		return nil, errEnvelopeHeaderV2
 	}
 
 	// Transaction
@@ -199,6 +220,12 @@ func (s *Standard850) ToBytes(ctx context.Context) (*[]byte, error){
 		return nil, errTrailer
 	}
 
+	// Envelope Trailer
+	errEnvelopeTrailerV2V2 := enc.Encode(s.EnvelopeTrailerV2)
+	if errEnvelopeTrailerV2V2 != nil {
+		return nil, errEnvelopeTrailerV2V2
+	}
+
 	w.Flush()
 	if err := w.Error(); err != nil {
 		return nil, err
@@ -209,7 +236,7 @@ func (s *Standard850) ToBytes(ctx context.Context) (*[]byte, error){
 	return &byteArray, nil
 }
 
-func (s *Standard850) FromBytes(ctx context.Context, req []byte) (error){
+func (s *Standard850V1) FromBytes(ctx context.Context, req []byte) (error){
 
 	r := csv.NewReader(bytes.NewReader(req))
 	r.Comma = '\t'
@@ -241,34 +268,48 @@ func (s *Standard850) FromBytes(ctx context.Context, req []byte) (error){
 
 		// Build
 		switch lineType {
+		case "EASI":
+			var x EnvelopeHeaderV2
+			err := x.FromSlice(ctx, record)
+			if err != nil {
+				return err
+			}
+			s.EnvelopeHeaderV2 = x
 		case "01":
-			var x Standard850Transaction
+			var x Standard850V1Transaction
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.Transaction = x
 		case "02":
-			var x Standard850LineItem
+			var x Standard850V1LineItem
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.LineItems = append(s.LineItems, x)
 		case "06":
-			var x Standard850OtherCharge
+			var x Standard850V1OtherCharge
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.OtherCharges = append(s.OtherCharges, x)
 		case "09":
-			var x Standard850Trailer
+			var x Standard850V1Trailer
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.Trailer = x
+		case "EASX":
+			var x EnvelopeTrailerV2
+			err := x.FromSlice(ctx, record)
+			if err != nil {
+				return err
+			}
+			s.EnvelopeTrailerV2 = x
 		default:
 			
 		}
@@ -278,7 +319,7 @@ func (s *Standard850) FromBytes(ctx context.Context, req []byte) (error){
 	return nil
 }
 
-func (s *Standard850Transaction) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1Transaction) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.Header = req[0]
@@ -320,133 +361,130 @@ func (s *Standard850Transaction) FromSlice(ctx context.Context, req []string) (e
 		s.StoreID = req[12]
 	}
 	if len(req) > 13 {
-		s.DistributionCenterID = req[13]
+		s.VendorID = req[13]
 	}
 	if len(req) > 14 {
-		s.VendorID = req[14]
+		s.ContactNameNumber = req[14]
 	}
 	if len(req) > 15 {
-		s.ContactNameNumber = req[15]
+		s.FOBPaymentInstructions = req[15]
 	}
 	if len(req) > 16 {
-		s.FOBPaymentInstructions = req[16]
+		s.SalesRequirementCodeShipment = req[16]
 	}
 	if len(req) > 17 {
-		s.SalesRequirementCodeShipment = req[17]
+		s.SalesRequirementCodeTruckLoad = req[17]
 	}
 	if len(req) > 18 {
-		s.SalesRequirementCodeTruckLoad = req[18]
+		s.SalesRequirementCodeShipDate = req[18]
 	}
 	if len(req) > 19 {
-		s.SalesRequirementCodeShipDate = req[19]
+		s.SalesRequirementCodeConsignmentOrShipBlind = req[19]
 	}
 	if len(req) > 20 {
-		s.SalesRequirementCodeConsignmentOrShipBlind = req[20]
+		s.PaymentTermsDiscountOffered = req[20]
 	}
 	if len(req) > 21 {
-		s.PaymentTermsDiscountOffered = req[21]
+		s.PaymentTermsDiscountDays = req[21]
 	}
 	if len(req) > 22 {
-		s.PaymentTermsDiscountDays = req[22]
+		s.PaymentDueInNumberOfDaysWithoutDiscount = req[22]
 	}
 	if len(req) > 23 {
-		s.PaymentDueInNumberOfDaysWithoutDiscount = req[23]
+		s.SpecificPaymentDate = req[23]
 	}
 	if len(req) > 24 {
-		s.SpecificPaymentDate = req[24]
+		s.LiteralOfPaymentTerms = req[24]
 	}
 	if len(req) > 25 {
-		s.LiteralOfPaymentTerms = req[25]
+		s.RequestedShipDate = req[25]
 	}
 	if len(req) > 26 {
-		s.RequestedShipDate = req[26]
+		s.CancelDate = req[26]
 	}
 	if len(req) > 27 {
-		s.CancelDate = req[27]
+		s.CarrierRoutingDetails = req[27]
 	}
 	if len(req) > 28 {
-		s.CarrierRoutingDetails = req[28]
+		s.DeliverToCompanyName = req[28]
 	}
 	if len(req) > 29 {
-		s.DeliverToCompanyName = req[29]
+		s.DeliverToContactName = req[29]
 	}
 	if len(req) > 30 {
-		s.DeliverToContactName = req[30]
+		s.DeliverToAddress1 = req[30]
 	}
 	if len(req) > 31 {
-		s.DeliverToAddress1 = req[31]
+		s.DeliverToAddress2 = req[31]
 	}
 	if len(req) > 32 {
-		s.DeliverToAddress2 = req[32]
+		s.DeliverToCityName = req[32]
 	}
 	if len(req) > 33 {
-		s.DeliverToCityName = req[33]
+		s.DeliverToStateCode = req[33]
 	}
 	if len(req) > 34 {
-		s.DeliverToStateCode = req[34]
+		s.DeliverToPostalCode = req[34]
 	}
 	if len(req) > 35 {
-		s.DeliverToPostalCode = req[35]
+		s.DeliverToCountryCode = req[35]
 	}
 	if len(req) > 36 {
-		s.DeliverToCountryCode = req[36]
-	}
-	if len(req) > 37 {
 		s.DropShipCode = req[37]
 	}
+	if len(req) > 37 {
+		s.SpecialDeliveryInstructions = req[37]
+	}
 	if len(req) > 38 {
-		s.SpecialDeliveryInstructions = req[38]
+		s.SpecialOrderInstructions = req[38]
 	}
-	if len(req) > 39 {
-		s.SpecialOrderInstructions = req[39]
-	}
-	if len(req) > 40 {
-		s.DeliverToCountyProvinceTownTerritory = req[40]
-	}
-	if len(req) > 41 {
-		s.PromotionalCode = req[41]
-	}
-	if len(req) > 42 {
-		s.DeliveryServiceLevel = req[42]
-	}
-	if len(req) > 43 {
-		s.DeliverToReceiversPhoneNumber = req[43]
-	}
-	if len(req) > 44 {
-		s.CustomerPONumber = req[44]
-	}
-	if len(req) > 45 {
-		s.CODForMerchandise = req[45]
-	}
-	if len(req) > 46 {
-		s.ReceiversEmailAddress = req[46]
-	}
-	if len(req) > 47 {
-		s.AccountNumber = req[47]
-	}
-	if len(req) > 48 {
-		s.NameOfAccount = req[48]
-	}
-	if len(req) > 49 {
-		s.TrackingID = req[49]
-	}
-	if len(req) > 50 {
-		s.PurchasersAccountID = req[50]
-	}
-	if len(req) > 51 {
-		s.DeliverToCommercialOrResidentialSite = req[51]
-	}
-	if len(req) > 52 {
-		s.CODTagsIndicator = req[52]
-	}
-	if len(req) > 53 {
-		s.ThirdPartyAccountNumber = req[53]
-	}
+	// if len(req) > 40 {
+	// 	s.DeliverToCountyProvinceTownTerritory = req[40]
+	// }
+	// if len(req) > 41 {
+	// 	s.PromotionalCode = req[41]
+	// }
+	// if len(req) > 42 {
+	// 	s.DeliveryServiceLevel = req[42]
+	// }
+	// if len(req) > 43 {
+	// 	s.DeliverToReceiversPhoneNumber = req[43]
+	// }
+	// if len(req) > 44 {
+	// 	s.CustomerPONumber = req[44]
+	// }
+	// if len(req) > 45 {
+	// 	s.CODForMerchandise = req[45]
+	// }
+	// if len(req) > 46 {
+	// 	s.ReceiversEmailAddress = req[46]
+	// }
+	// if len(req) > 47 {
+	// 	s.AccountNumber = req[47]
+	// }
+	// if len(req) > 48 {
+	// 	s.NameOfAccount = req[48]
+	// }
+	// if len(req) > 49 {
+	// 	s.TrackingID = req[49]
+	// }
+	// if len(req) > 50 {
+	// 	s.PurchasersAccountID = req[50]
+	// }
+	// if len(req) > 51 {
+	// 	s.DeliverToCommercialOrResidentialSite = req[51]
+	// }
+	// if len(req) > 52 {
+	// 	s.CODTagsIndicator = req[52]
+	// }
+	// if len(req) > 53 {
+	// 	s.ThirdPartyAccountNumber = req[53]
+	// }
 
 	return nil
 }
 
-func (s *Standard850LineItem) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1LineItem) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.DetailSectionLoopA = req[0]
@@ -507,7 +545,7 @@ func (s *Standard850LineItem) FromSlice(ctx context.Context, req []string) (erro
 	return nil
 }
 
-func (s *Standard850OtherCharge) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1OtherCharge) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.OtherChargesRecord = req[0]
@@ -537,7 +575,7 @@ func (s *Standard850OtherCharge) FromSlice(ctx context.Context, req []string) (e
 	return nil
 }
 
-func (s *Standard850Trailer) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1Trailer) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.TrailerRecord = req[0]
@@ -560,45 +598,45 @@ func (s *Standard850Trailer) FromSlice(ctx context.Context, req []string) (error
 			s.TotalQuantityOrdered = totalQuantityOrdered
 		}
 	}
-	if len(req) > 3 {
-		if req[3] != "" {
-			totalMonetaryValueFloat, err := strconv.ParseFloat(req[3], 64)
-			if err != nil {
-				return err
-			}
-			s.TotalMonetaryValue = int((totalMonetaryValueFloat * float64(100) + 0.5))
-		}
+	// if len(req) > 3 {
+	// 	if req[3] != "" {
+	// 		totalMonetaryValueFloat, err := strconv.ParseFloat(req[3], 64)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.TotalMonetaryValue = int((totalMonetaryValueFloat * float64(100) + 0.5))
+	// 	}
 		
-	}
-	if len(req) > 4 {
-		if req[4] != "" {
-			totalMonetaryValueOfOtherChargesFloat, err := strconv.ParseFloat(req[4], 64)
-			if err != nil {
-				return err
-			}
-			s.TotalMonetaryValueOfOtherCharges = int((totalMonetaryValueOfOtherChargesFloat * float64(100) + 0.5))
-		}
+	// }
+	// if len(req) > 4 {
+	// 	if req[4] != "" {
+	// 		totalMonetaryValueOfOtherChargesFloat, err := strconv.ParseFloat(req[4], 64)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.TotalMonetaryValueOfOtherCharges = int((totalMonetaryValueOfOtherChargesFloat * float64(100) + 0.5))
+	// 	}
 		
-	}
-	if len(req) > 5 {
-		if req[5] != "" {
-			numberOfCases, err := strconv.Atoi(req[1])
-			if err != nil {
-				return err
-			}
-			s.NumberOfCases = numberOfCases
-		}
-	}
-	if len(req) > 6 {
-		if req[6] != "" {
-			purchaseOrderTotalAmountFloat, err := strconv.ParseFloat(req[6], 64)
-			if err != nil {
-				return err
-			}
-			s.PurchaseOrderTotalAmount = int((purchaseOrderTotalAmountFloat * float64(100) + 0.5))
-		}
+	// }
+	// if len(req) > 5 {
+	// 	if req[5] != "" {
+	// 		numberOfCases, err := strconv.Atoi(req[1])
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.NumberOfCases = numberOfCases
+	// 	}
+	// }
+	// if len(req) > 6 {
+	// 	if req[6] != "" {
+	// 		purchaseOrderTotalAmountFloat, err := strconv.ParseFloat(req[6], 64)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.PurchaseOrderTotalAmount = int((purchaseOrderTotalAmountFloat * float64(100) + 0.5))
+	// 	}
 		
-	}
+	// }
 
 	return nil
 }

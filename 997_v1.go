@@ -9,7 +9,13 @@ import(
 	"github.com/jszwec/csvutil"
 )
 
-type Standard997 struct {
+type Standard997V1 struct {
+	EnvelopeHeaderV2 EnvelopeHeaderV2
+	Body Standard997V1Body
+	EnvelopeTrailerV2 EnvelopeTrailerV2
+}
+
+type Standard997V1Body struct {
 	Header string
 	TransactionType string
 	VersionNumber string
@@ -24,21 +30,33 @@ type Standard997 struct {
 	TransactionSetAcknowledgementCodes string
 }
 
-func (s *Standard997) Prep(ctx context.Context) (error){
+func (s *Standard997V1) Prep(ctx context.Context) (error){
+	
+	// Header
+	errHeader := s.EnvelopeHeaderV2.Prep(ctx)
+	if errHeader != nil {
+		return errHeader
+	}
+	s.EnvelopeHeaderV2.TransactionType = "997"
 
 	// Transaction
-	s.Header = "01"
-	s.TransactionType = "997"
-	s.VersionNumber = "2.0"
-	s.SenderQualifier = "01"
-	s.FileCreationDate = time.Now().Format("20060102")
-	s.FileCreationTime = time.Now().Format("150405")
+	s.Body.Header = "01"
+	s.Body.TransactionType = "997"
+	s.Body.VersionNumber = "2.0"
+	s.Body.SenderQualifier = "01"
+	s.Body.FileCreationDate = time.Now().Format("20060102")
+	s.Body.FileCreationTime = time.Now().Format("150405")
 
+	// Trailer
+	errTrailer := s.EnvelopeTrailerV2.Prep(ctx)
+	if errTrailer != nil {
+		return errTrailer
+	}
 
 	return nil
 }
 
-func (s *Standard997) ToBytes(ctx context.Context) (*[]byte, error){
+func (s *Standard997V1) ToBytes(ctx context.Context) (*[]byte, error){
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -58,10 +76,22 @@ func (s *Standard997) ToBytes(ctx context.Context) (*[]byte, error){
 		return nil, errHeader
 	}
 
-	// Transaction
-	errTransaction := enc.Encode(s)
-	if errTransaction != nil {
-		return nil, errTransaction
+	// Envelope Header
+	errEnvelopeHeaderV2 := enc.Encode(s.EnvelopeHeaderV2)
+	if errEnvelopeHeaderV2 != nil {
+		return nil, errEnvelopeHeaderV2
+	}
+	
+	// Body
+	errBody := enc.Encode(s.Body)
+	if errBody != nil {
+		return nil, errBody
+	}
+
+	// Envelope Trailer
+	errEnvelopeTrailerV2 := enc.Encode(s.EnvelopeTrailerV2)
+	if errEnvelopeTrailerV2 != nil {
+		return nil, errEnvelopeTrailerV2
 	}
 
 	w.Flush()
@@ -74,7 +104,7 @@ func (s *Standard997) ToBytes(ctx context.Context) (*[]byte, error){
 	return &byteArray, nil
 }
 
-func (s *Standard997) FromBytes(ctx context.Context, req []byte) (error){
+func (s *Standard997V1) FromBytes(ctx context.Context, req []byte) (error){
 
 	r := csv.NewReader(bytes.NewReader(req))
 	r.Comma = '\t'
@@ -106,13 +136,27 @@ func (s *Standard997) FromBytes(ctx context.Context, req []byte) (error){
 
 		// Build
 		switch lineType {
-		case "01":
-			var x Standard997
+		case "EASI":
+			var x EnvelopeHeaderV2
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
-			s = &x
+			s.EnvelopeHeaderV2 = x
+		case "01":
+			var x Standard997V1Body
+			err := x.FromSlice(ctx, record)
+			if err != nil {
+				return err
+			}
+			s.Body = x
+		case "EASX":
+			var x EnvelopeTrailerV2
+			err := x.FromSlice(ctx, record)
+			if err != nil {
+				return err
+			}
+			s.EnvelopeTrailerV2 = x
 		default:
 			
 		}
@@ -122,7 +166,7 @@ func (s *Standard997) FromBytes(ctx context.Context, req []byte) (error){
 	return nil
 }
 
-func (s *Standard997) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard997V1Body) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.Header = req[0]

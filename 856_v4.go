@@ -8,22 +8,22 @@ import(
 	"bytes"
 	"strconv"
 	"encoding/csv"
-	"encoding/json"
 	"github.com/jszwec/csvutil"
 )
 
-type Standard856 struct {
-	Transaction Standard856Transaction
-	Pallets []Standard856Pallet
-	Trailer Standard856Trailer
+type Standard856V4 struct {
+	EnvelopeHeaderV2 EnvelopeHeaderV2
+	Transaction Standard856V4Transaction
+	Pallets []Standard856V4Pallet
+	Trailer Standard856V4Trailer
+	EnvelopeTrailerV2 EnvelopeTrailerV2
 }
 
-type Standard856Transaction struct {
+type Standard856V4Transaction struct {
 	Header string
-	TransactionType string
-	TransactionSetPurpose string
 	VersionNumber string
 	ShipmentNumber string
+	TransactionSetPurpose string
 	ASNDate string
 	ASNTime string
 	VendorID string
@@ -41,17 +41,17 @@ type Standard856Transaction struct {
 	CarrierRoutingDetails string
 	TrailerID string
 	ShipmentDate string
-	DeliverToContactName string
-	DropShipCode string
+	// DeliverToContactName string
+	// DropShipCode string
 }
 
-type Standard856Pallet struct {
+type Standard856V4Pallet struct {
 	PalletRecord string
 	PalletID string
-	Shipments []Standard856Shipment `csv:"-"`
+	Shipments []Standard856V4Shipment `csv:"-"`
 }
 
-type Standard856Shipment struct {
+type Standard856V4Shipment struct {
 	DetailSectionLoopA string
 	CarrierTrackingNumber string
 	ManufacturersSerialCaseNumber string
@@ -65,12 +65,14 @@ type Standard856Shipment struct {
 	CaseWeightFormatted string
 	FreightCharge int `csv:"-"`
 	FreightChargeFormatted string
-	LineItems []Standard856LineItem `csv:"-"`
+	LineItems []Standard856V4LineItem `csv:"-"`
 }
 
-type Standard856LineItem struct {
-	DetailSectionLoopB string
-	LineItemNumber int
+type Standard856V4LineItem struct {
+	DetailSectionLoopA string
+	IndicatorToStandard string
+	ManufacturersSerialCaseNumber string
+	BuyersPurchaseOrderNumber string
 	ItemIdentificationGTIN string
 	MasterStyle string
 	DetailStyle string
@@ -78,28 +80,35 @@ type Standard856LineItem struct {
 	SizeCode string
 	RevisionCode string
 	UnitOrBasisForMeasurementCode string
-	QuantityShipped int
+	Quantity int
 	CountryOfOrigin string
+	ManufacturersOrderNumber string
 	ManufacturersLotID string
-	BuyersPurchaseOrderNumber string
 }
 
-type Standard856Trailer struct {
+type Standard856V4Trailer struct {
 	TrailerRecord string
 	TotalCaseCount int
-	TotalQtyShipped int
+	// TotalQtyShipped int
 	TotalGrossWeight int
-	TotalFreightCharges int `csv:"-"`
-	TotalFreightChargesFormatted string
+	// TotalFreightCharges int `csv:"-"`
+	// TotalFreightChargesFormatted string
 	RecordCount int
 	TotalPalletCount int
 }
 
-func (s *Standard856) Prep(ctx context.Context) (error){
+func (s *Standard856V4) Prep(ctx context.Context) (error){
+
+	// Header
+	errHeader := s.EnvelopeHeaderV2.Prep(ctx)
+	if errHeader != nil {
+		return errHeader
+	}
+	s.EnvelopeHeaderV2.TransactionType = "856"
 
 	// Transaction
 	s.Transaction.Header = "01"
-	s.Transaction.TransactionType = "856"
+	// s.Transaction.TransactionType = "856"
 	s.Transaction.TransactionSetPurpose = "00"
 	
 	s.Transaction.VersionNumber = "7.0"
@@ -120,9 +129,9 @@ func (s *Standard856) Prep(ctx context.Context) (error){
 			totalFreightCharges += palletShipment.FreightCharge
 
 			// Line Items
-			for palletShipmentLineItemKey, _ := range palletShipment.LineItems {
-				s.Pallets[palletKey].Shipments[palletShipmentKey].LineItems[palletShipmentLineItemKey].DetailSectionLoopB = "03"
-			}
+			// for palletShipmentLineItemKey, _ := range palletShipment.LineItems {
+			// 	s.Pallets[palletKey].Shipments[palletShipmentKey].LineItems[palletShipmentLineItemKey].DetailSectionLoopB = "03"
+			// }
 
 		}
 
@@ -130,12 +139,18 @@ func (s *Standard856) Prep(ctx context.Context) (error){
 
 	// Trailer
 	s.Trailer.TrailerRecord = "09"
-	s.Trailer.TotalFreightChargesFormatted = fmt.Sprintf("%.4f", float64(totalFreightCharges) / 100)
+	// s.Trailer.TotalFreightChargesFormatted = fmt.Sprintf("%.4f", float64(totalFreightCharges) / 100)
+
+	// Trailer
+	errTrailer := s.EnvelopeTrailerV2.Prep(ctx)
+	if errTrailer != nil {
+		return errTrailer
+	}
 
 	return nil
 }
 
-func (s *Standard856) ToBytes(ctx context.Context) (*[]byte, error){
+func (s *Standard856V4) ToBytes(ctx context.Context) (*[]byte, error){
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -153,6 +168,12 @@ func (s *Standard856) ToBytes(ctx context.Context) (*[]byte, error){
 	errHeader := enc.EncodeHeader(header{})
 	if errHeader != nil {
 		return nil, errHeader
+	}
+
+	// Envelope Header
+	errEnvelopeHeaderV2 := enc.Encode(s.EnvelopeHeaderV2)
+	if errEnvelopeHeaderV2 != nil {
+		return nil, errEnvelopeHeaderV2
 	}
 
 	// Transaction
@@ -192,6 +213,12 @@ func (s *Standard856) ToBytes(ctx context.Context) (*[]byte, error){
 		return nil, errTrailer
 	}
 
+	// Envelope Trailer
+	errEnvelopeTrailerV2 := enc.Encode(s.EnvelopeTrailerV2)
+	if errEnvelopeTrailerV2 != nil {
+		return nil, errEnvelopeTrailerV2
+	}
+
 	w.Flush()
 	if err := w.Error(); err != nil {
 		return nil, err
@@ -202,7 +229,7 @@ func (s *Standard856) ToBytes(ctx context.Context) (*[]byte, error){
 	return &byteArray, nil
 }
 
-func (s *Standard856) FromBytes(ctx context.Context, req []byte) (error){
+func (s *Standard856V4) FromBytes(ctx context.Context, req []byte) (error){
 
 	r := csv.NewReader(bytes.NewReader(req))
 	r.Comma = '\t'
@@ -235,15 +262,22 @@ func (s *Standard856) FromBytes(ctx context.Context, req []byte) (error){
 
 		// Build
 		switch lineType {
+		case "EASI":
+			var x EnvelopeHeaderV2
+			err := x.FromSlice(ctx, record)
+			if err != nil {
+				return err
+			}
+			s.EnvelopeHeaderV2 = x
 		case "01":
-			var x Standard856Transaction
+			var x Standard856V4Transaction
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.Transaction = x
 		case "05":
-			var x Standard856Pallet
+			var x Standard856V4Pallet
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
@@ -252,7 +286,7 @@ func (s *Standard856) FromBytes(ctx context.Context, req []byte) (error){
 			palletCount++
 			shipmentCount = 0
 		case "02":
-			var x Standard856Shipment
+			var x Standard856V4Shipment
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
@@ -260,37 +294,42 @@ func (s *Standard856) FromBytes(ctx context.Context, req []byte) (error){
 			s.Pallets[palletCount - 1].Shipments = append(s.Pallets[palletCount - 1].Shipments, x)
 			shipmentCount++
 		case "03":
-			var x Standard856LineItem
+			var x Standard856V4LineItem
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.Pallets[palletCount - 1].Shipments[shipmentCount - 1].LineItems = append(s.Pallets[palletCount - 1].Shipments[shipmentCount - 1].LineItems, x)
 		case "09":
-			var x Standard856Trailer
+			var x Standard856V4Trailer
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
 			s.Trailer = x
+		case "EASX":
+			var x EnvelopeTrailerV2
+			err := x.FromSlice(ctx, record)
+			if err != nil {
+				return err
+			}
+			s.EnvelopeTrailerV2 = x
 		default:
 			
 		}
 
 	}
-	c, _ := json.Marshal(s)
-	fmt.Println(string(c))
 
 	return nil
 }
 
-func (s *Standard856Transaction) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V4Transaction) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.Header = req[0]
 	}
 	if len(req) > 1 {
-		s.TransactionType = req[1]
+		// s.TransactionType = req[1]
 	}
 	if len(req) > 2 {
 		s.TransactionSetPurpose = req[2]
@@ -352,17 +391,17 @@ func (s *Standard856Transaction) FromSlice(ctx context.Context, req []string) (e
 	if len(req) > 21 {
 		s.ShipmentDate = req[21]
 	}
-	if len(req) > 22 {
-		s.DeliverToContactName = req[22]
-	}
-	if len(req) > 23 {
-		s.DropShipCode = req[23]
-	}
+	// if len(req) > 22 {
+	// 	s.DeliverToContactName = req[22]
+	// }
+	// if len(req) > 23 {
+	// 	s.DropShipCode = req[23]
+	// }
 
 	return nil
 }
 
-func (s *Standard856Trailer) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V4Trailer) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.TrailerRecord = req[0]
@@ -377,15 +416,15 @@ func (s *Standard856Trailer) FromSlice(ctx context.Context, req []string) (error
 			s.TotalCaseCount = totalCaseCount
 		}
 	}
-	if len(req) > 2 {
-		if req[2] != "" {
-			totalQtyShipped, err := strconv.Atoi(req[2])
-			if err != nil {
-				return err
-			}
-			s.TotalQtyShipped = totalQtyShipped
-		}
-	}
+	// if len(req) > 2 {
+	// 	if req[2] != "" {
+	// 		totalQtyShipped, err := strconv.Atoi(req[2])
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.TotalQtyShipped = totalQtyShipped
+	// 	}
+	// }
 	if len(req) > 3 {
 		if req[3] != "" {
 			totalGrossWeight, err := strconv.Atoi(req[3])
@@ -395,15 +434,15 @@ func (s *Standard856Trailer) FromSlice(ctx context.Context, req []string) (error
 			s.TotalGrossWeight = totalGrossWeight
 		}
 	}
-	if len(req) > 4 {
-		if req[4] != "" {
-			totalFreightChargesFloat, err := strconv.ParseFloat(req[4], 64)
-			if err != nil {
-				return err
-			}
-			s.TotalFreightCharges = int((totalFreightChargesFloat * float64(100) + 0.5))
-		}
-	}
+	// if len(req) > 4 {
+	// 	if req[4] != "" {
+	// 		totalFreightChargesFloat, err := strconv.ParseFloat(req[4], 64)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.TotalFreightCharges = int((totalFreightChargesFloat * float64(100) + 0.5))
+	// 	}
+	// }
 	if len(req) > 5 {
 		if req[5] != "" {
 			recordCount, err := strconv.Atoi(req[5])
@@ -426,7 +465,7 @@ func (s *Standard856Trailer) FromSlice(ctx context.Context, req []string) (error
 	return nil
 }
 
-func (s *Standard856Pallet) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V4Pallet) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.PalletRecord = req[0]
@@ -438,7 +477,7 @@ func (s *Standard856Pallet) FromSlice(ctx context.Context, req []string) (error)
 	return nil
 }
 
-func (s *Standard856Shipment) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V4Shipment) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.DetailSectionLoopA = req[0]
@@ -489,20 +528,20 @@ func (s *Standard856Shipment) FromSlice(ctx context.Context, req []string) (erro
 	return nil
 }
 
-func (s *Standard856LineItem) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V4LineItem) FromSlice(ctx context.Context, req []string) (error){
 
-	if len(req) > 0 {
-		s.DetailSectionLoopB = req[0]
-	}
-	if len(req) > 1 {
-		if req[1] != "" {
-			lineItemNumber, err := strconv.Atoi(req[1])
-			if err != nil {
-				return err
-			}
-			s.LineItemNumber = lineItemNumber
-		}
-	}
+	// if len(req) > 0 {
+	// 	s.DetailSectionLoopB = req[0]
+	// }
+	// if len(req) > 1 {
+	// 	if req[1] != "" {
+	// 		lineItemNumber, err := strconv.Atoi(req[1])
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.LineItemNumber = lineItemNumber
+	// 	}
+	// }
 	if len(req) > 2 {
 		s.ItemIdentificationGTIN = req[2]
 	}
@@ -524,15 +563,15 @@ func (s *Standard856LineItem) FromSlice(ctx context.Context, req []string) (erro
 	if len(req) > 8 {
 		s.UnitOrBasisForMeasurementCode = req[8]
 	}
-	if len(req) > 9 {
-		if req[9] != "" {
-			quantityShipped, err := strconv.Atoi(req[9])
-			if err != nil {
-				return err
-			}
-			s.QuantityShipped = quantityShipped
-		}
-	}
+	// if len(req) > 9 {
+	// 	if req[9] != "" {
+	// 		quantityShipped, err := strconv.Atoi(req[9])
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		s.QuantityShipped = quantityShipped
+	// 	}
+	// }
 	if len(req) > 9 {
 		s.CountryOfOrigin = req[9]
 	}
