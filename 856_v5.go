@@ -1,6 +1,7 @@
 package easi
 
 import(
+	// "fmt"
 	"context"
 	"io"
 	"time"
@@ -12,13 +13,11 @@ import(
 
 type Standard856V5 struct {
 	EnvelopeHeaderV2 EnvelopeHeaderV2
-	Transaction Standard856V5Transaction
-	Pallets []Standard856V5Pallet
-	Trailer Standard856V5Trailer
+	Transactions []Standard856V5Transaction
 	EnvelopeTrailerV2 EnvelopeTrailerV2
 }
 
-type Standard856V5Transaction struct {
+type Standard856V5TransactionHeader struct {
 	Header string
 	TransactionType string
 	TransactionSetPurpose string
@@ -41,6 +40,23 @@ type Standard856V5Transaction struct {
 	TrailerID string
 	CarrierTrackingNumber string
 	ShipmentDate string
+	
+}
+
+type Standard856V5TransactionTrailer struct {
+	TrailerRecord string
+	TotalCaseCount int
+	TotalQtyShipped int
+	TotalGrossWeight int
+	RecordCount int
+	TotalPalletCount int
+}
+
+type Standard856V5Transaction struct {
+	Header Standard856V5TransactionHeader
+	Pallets []Standard856V5Pallet `csv:"-"`
+	Trailer Standard856V5TransactionTrailer
+	
 }
 
 type Standard856V5Pallet struct {
@@ -67,14 +83,7 @@ type Standard856V5LineItem struct {
 	ManufacturersLotID string
 }
 
-type Standard856V5Trailer struct {
-	TrailerRecord string
-	TotalCaseCount int
-	TotalQtyShipped int
-	TotalGrossWeight int
-	RecordCount int
-	TotalPalletCount int
-}
+
 
 func (s *Standard856V5) Prep(ctx context.Context) (error){
 
@@ -85,29 +94,32 @@ func (s *Standard856V5) Prep(ctx context.Context) (error){
 	}
 	s.EnvelopeHeaderV2.TransactionType = "856"
 
-	// Transaction
-	s.Transaction.Header = "01"
-	s.Transaction.TransactionType = "856"
-	s.Transaction.TransactionSetPurpose = "00"
-	
-	s.Transaction.VersionNumber = "7.0"
-	s.Transaction.ASNDate = time.Now().Format("20060102")
-	s.Transaction.ASNTime = time.Now().Format("150405")
-	s.Transaction.ShipmentDate = time.Now().Format("20060102")
+	// Transactions
+	for transactionKey, transaction := range s.Transactions {
 
-	// Pallets
-	for palletKey, pallet := range s.Pallets {
-		s.Pallets[palletKey].PalletRecord = "05"
+		s.Transactions[transactionKey].Header.Header = "01"
+		s.Transactions[transactionKey].Header.TransactionType = "856"
+		s.Transactions[transactionKey].Header.TransactionSetPurpose = "00"
+		
+		s.Transactions[transactionKey].Header.VersionNumber = "7.0"
+		s.Transactions[transactionKey].Header.ASNDate = time.Now().Format("20060102")
+		s.Transactions[transactionKey].Header.ASNTime = time.Now().Format("150405")
+		s.Transactions[transactionKey].Header.ShipmentDate = time.Now().Format("20060102")
 
-		// Line Items
-		for palletLineItemKey, _ := range pallet.LineItems {
-			s.Pallets[palletKey].LineItems[palletLineItemKey].DetailSectionLoopB = "02"
+		// Pallets
+		for palletKey, pallet := range transaction.Pallets {
+			s.Transactions[transactionKey].Pallets[palletKey].PalletRecord = "05"
+
+			// Line Items
+			for palletLineItemKey, _ := range pallet.LineItems {
+				s.Transactions[transactionKey].Pallets[palletKey].LineItems[palletLineItemKey].DetailSectionLoopB = "02"
+			}
+
 		}
 
+		s.Transactions[transactionKey].Trailer.TrailerRecord = "09"
 	}
-
-	// Trailer
-	s.Trailer.TrailerRecord = "09"
+	
 
 	// Trailer
 	errTrailer := s.EnvelopeTrailerV2.Prep(ctx)
@@ -144,34 +156,39 @@ func (s *Standard856V5) ToBytes(ctx context.Context) (*[]byte, error){
 		return nil, errEnvelopeHeaderV2
 	}
 
-	// Transaction
-	errTransaction := enc.Encode(s.Transaction)
-	if errTransaction != nil {
-		return nil, errTransaction
-	}
+	// Transactions
+	for _, transaction := range s.Transactions {
 
-	// Pallets
-	for _, pallet := range s.Pallets {
-		errPallet := enc.Encode(pallet)
-		if errPallet != nil {
-			return nil, errPallet
+		// Header
+		errTransaction := enc.Encode(transaction.Header)
+		if errTransaction != nil {
+			return nil, errTransaction
 		}
 
-		// Line Items
-		for _, lineItem := range pallet.LineItems {
-			errLineItem := enc.Encode(lineItem)
-			if errLineItem != nil {
-				return nil, errLineItem
+		// Pallets
+		for _, pallet := range transaction.Pallets {
+			errPallet := enc.Encode(pallet)
+			if errPallet != nil {
+				return nil, errPallet
+			}
+
+			// Line Items
+			for _, lineItem := range pallet.LineItems {
+				errLineItem := enc.Encode(lineItem)
+				if errLineItem != nil {
+					return nil, errLineItem
+				}
 			}
 		}
-	}
 
-	// Trailer
-	errTrailer := enc.Encode(s.Trailer)
-	if errTrailer != nil {
-		return nil, errTrailer
-	}
+		// Trailer
+		errTrailer := enc.Encode(transaction.Trailer)
+		if errTrailer != nil {
+			return nil, errTrailer
+		}
 
+	}
+	
 	// Envelope Trailer
 	errEnvelopeTrailerV2 := enc.Encode(s.EnvelopeTrailerV2)
 	if errEnvelopeTrailerV2 != nil {
@@ -205,7 +222,7 @@ func (s *Standard856V5) FromBytes(ctx context.Context, req []byte) (error){
 		return errDecoder
 	}
 	
-	var palletCount int
+	var transactionCount, palletCount int
 	for {
 		var v struct{}
 		if err := dec.Decode(&v); err == io.EOF {
@@ -229,19 +246,22 @@ func (s *Standard856V5) FromBytes(ctx context.Context, req []byte) (error){
 			}
 			s.EnvelopeHeaderV2 = x
 		case "01":
-			var x Standard856V5Transaction
+			var x Standard856V5TransactionHeader
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
-			s.Transaction = x
+			s.Transactions = append(s.Transactions, Standard856V5Transaction{})
+			palletCount = 0
+			transactionCount++
+			s.Transactions[transactionCount - 1].Header = x
 		case "05":
 			var x Standard856V5Pallet
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
-			s.Pallets = append(s.Pallets, x)
+			s.Transactions[transactionCount - 1].Pallets = append(s.Transactions[transactionCount - 1].Pallets, x)
 			palletCount++
 		case "02":
 			var x Standard856V5LineItem
@@ -250,17 +270,17 @@ func (s *Standard856V5) FromBytes(ctx context.Context, req []byte) (error){
 				return err
 			}
 			if palletCount <= 0 {
-				s.Pallets = append(s.Pallets, Standard856V5Pallet{})
+				s.Transactions[transactionCount - 1].Pallets = append(s.Transactions[transactionCount - 1].Pallets, Standard856V5Pallet{})
 				palletCount++
 			}
-			s.Pallets[palletCount - 1].LineItems = append(s.Pallets[palletCount - 1].LineItems, x)
+			s.Transactions[transactionCount - 1].Pallets[palletCount - 1].LineItems = append(s.Transactions[transactionCount - 1].Pallets[palletCount - 1].LineItems, x)
 		case "09":
-			var x Standard856V5Trailer
+			var x Standard856V5TransactionTrailer
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
-			s.Trailer = x
+			s.Transactions[transactionCount - 1].Trailer = x
 		case "EASX":
 			var x EnvelopeTrailerV2
 			err := x.FromSlice(ctx, record)
@@ -277,7 +297,7 @@ func (s *Standard856V5) FromBytes(ctx context.Context, req []byte) (error){
 	return nil
 }
 
-func (s *Standard856V5Transaction) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V5TransactionHeader) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.Header = req[0]
@@ -349,7 +369,7 @@ func (s *Standard856V5Transaction) FromSlice(ctx context.Context, req []string) 
 	return nil
 }
 
-func (s *Standard856V5Trailer) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard856V5TransactionTrailer) FromSlice(ctx context.Context, req []string) (error){
 
 	if len(req) > 0 {
 		s.TrailerRecord = req[0]

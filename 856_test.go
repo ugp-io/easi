@@ -102,7 +102,7 @@ func TestStandard856V5FromBytes(t *testing.T) {
 
     ctx := context.Background()
 	
-	bytes, readErr := ioutil.ReadFile("./examples/856_173384223_20210130005845.txt")
+	bytes, readErr := ioutil.ReadFile("./examples/856_173384223_20210311005605.txt")
 	if readErr != nil {
 		assert.Nil(t, readErr)
 	}
