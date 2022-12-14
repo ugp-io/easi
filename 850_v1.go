@@ -1,66 +1,67 @@
 package easi
 
-import(
-	"context"
-	"fmt"
+import (
 	"bytes"
-	"io"
-	"time"
-	"strconv"
+	"context"
 	"encoding/csv"
+	"fmt"
+	"io"
+	"strconv"
+	"time"
+
 	"github.com/jszwec/csvutil"
 )
 
-type Standard850V1 struct{
-	EnvelopeHeaderV2 EnvelopeHeaderV2
-	Transaction Standard850V1Transaction
-	LineItems []Standard850V1LineItem
-	OtherCharges []Standard850V1OtherCharge
-	Trailer Standard850V1Trailer
+type Standard850V1 struct {
+	EnvelopeHeaderV2  EnvelopeHeaderV2
+	Transaction       Standard850V1Transaction
+	LineItems         []Standard850V1LineItem
+	OtherCharges      []Standard850V1OtherCharge
+	Trailer           Standard850V1Trailer
 	EnvelopeTrailerV2 EnvelopeTrailerV2
 }
 
 type Standard850V1Transaction struct {
-	Header string
-	TransactionType string
-	TransactionSetPurpose string
-	VersionNumber string
-	PurchaseOrderTypeCode string
-	PurchaseOrderNumber string
-	ReleaseNumber string
-	PODate string
-	POTime string
-	ContractNumber string
-	CurrencyCode string
-	PurchaserAccountID string
-	StoreID string
-	VendorID string
-	ContactNameNumber string
-	FOBPaymentInstructions string
-	SalesRequirementCodeShipment string
-	SalesRequirementCodeTruckLoad string
-	SalesRequirementCodeShipDate string
+	Header                                     string
+	TransactionType                            string
+	TransactionSetPurpose                      string
+	VersionNumber                              string
+	PurchaseOrderTypeCode                      string
+	PurchaseOrderNumber                        string
+	ReleaseNumber                              string
+	PODate                                     string
+	POTime                                     string
+	ContractNumber                             string
+	CurrencyCode                               string
+	PurchaserAccountID                         string
+	StoreID                                    string
+	VendorID                                   string
+	ContactNameNumber                          string
+	FOBPaymentInstructions                     string
+	SalesRequirementCodeShipment               string
+	SalesRequirementCodeTruckLoad              string
+	SalesRequirementCodeShipDate               string
 	SalesRequirementCodeConsignmentOrShipBlind string
-	PaymentTermsDiscountOffered string
-	PaymentTermsDiscountDays string
-	PaymentDueInNumberOfDaysWithoutDiscount string
-	SpecificPaymentDate string
-	LiteralOfPaymentTerms string
-	RequestedShipDate string
-	CancelDate string
-	CarrierRoutingDetails string
-	DeliverToCompanyName string
-	DeliverToContactName string
-	DeliverToAddress1 string
-	DeliverToAddress2 string
-	DeliverToCityName string
-	DeliverToStateCode string
-	DeliverToPostalCode string
-	DeliverToCountryCode string
-	DropShipCode string
-	SpecialDeliveryInstructions string
-	SpecialOrderInstructions string
-	
+	PaymentTermsDiscountOffered                string
+	PaymentTermsDiscountDays                   string
+	PaymentDueInNumberOfDaysWithoutDiscount    string
+	SpecificPaymentDate                        string
+	LiteralOfPaymentTerms                      string
+	RequestedShipDate                          string
+	CancelDate                                 string
+	CarrierRoutingDetails                      string
+	DeliverToCompanyName                       string
+	DeliverToContactName                       string
+	DeliverToAddress1                          string
+	DeliverToAddress2                          string
+	DeliverToCityName                          string
+	DeliverToStateCode                         string
+	DeliverToPostalCode                        string
+	DeliverToCountryCode                       string
+	DropShipCode                               string
+	SpecialDeliveryInstructions                string
+	SpecialOrderInstructions                   string
+
 	// DeliverToCountyProvinceTownTerritory string
 	// PromotionalCode string
 	// DeliveryServiceLevel string
@@ -68,7 +69,7 @@ type Standard850V1Transaction struct {
 	// CustomerPONumber string
 	// CODForMerchandise string
 	// ReceiversEmailAddress string
-	// AccountNumber string 
+	// AccountNumber string
 	// NameOfAccount string
 	// TrackingID string
 	// PurchasersAccountID string
@@ -78,31 +79,31 @@ type Standard850V1Transaction struct {
 }
 
 type Standard850V1LineItem struct {
-	DetailSectionLoopA string
-	LineItemNumber int
-	ItemIdentificationGTIN string
-	MasterStyle string
-	ColorCode string
-	SizeCode string
-	QuantityOrdered int
-	UnitOrBasisForMeasurementCode string
-	PurchaseUnitPrice int `csv:"-"`
-	PurchaseUnitPriceFormatted string
-	TotalMonetaryAmountOfLineItem int `csv:"-"`
+	DetailSectionLoopA                     string
+	LineItemNumber                         int
+	ItemIdentificationGTIN                 string
+	MasterStyle                            string
+	ColorCode                              string
+	SizeCode                               string
+	QuantityOrdered                        int
+	UnitOrBasisForMeasurementCode          string
+	PurchaseUnitPrice                      int `csv:"-"`
+	PurchaseUnitPriceFormatted             string
+	TotalMonetaryAmountOfLineItem          int `csv:"-"`
 	TotalMonetaryAmountOfLineItemFormatted string
 }
 
 type Standard850V1OtherCharge struct {
-	OtherChargesRecord string
+	OtherChargesRecord            string
 	LineItemNumberForOtherCharges int
-	OtherChargeDescription string
-	OtherChargeAmount int `csv:"-"`
-	OtherChargeAmountFormatted string
+	OtherChargeDescription        string
+	OtherChargeAmount             int `csv:"-"`
+	OtherChargeAmountFormatted    string
 }
 
 type Standard850V1Trailer struct {
-	TrailerRecord string
-	RecordCount int
+	TrailerRecord        string
+	RecordCount          int
 	TotalQuantityOrdered int
 	// TotalMonetaryValue int `csv:"-"`
 	// TotalMonetaryValueFormatted string
@@ -113,7 +114,7 @@ type Standard850V1Trailer struct {
 	// PurchaseOrderTotalAmountFormatted string
 }
 
-func (s *Standard850V1) Prep(ctx context.Context) (error){
+func (s *Standard850V1) Prep(ctx context.Context) error {
 
 	// Header
 	errHeader := s.EnvelopeHeaderV2.Prep(ctx)
@@ -134,8 +135,8 @@ func (s *Standard850V1) Prep(ctx context.Context) (error){
 		s.LineItems[lineItemKey].DetailSectionLoopA = "02"
 		s.LineItems[lineItemKey].LineItemNumber = lineItemKey + 1
 		s.LineItems[lineItemKey].UnitOrBasisForMeasurementCode = "EA"
-		s.LineItems[lineItemKey].PurchaseUnitPriceFormatted = fmt.Sprintf("%.4f", float64(lineItem.PurchaseUnitPrice) / 100)
-		s.LineItems[lineItemKey].TotalMonetaryAmountOfLineItemFormatted = fmt.Sprintf("%.4f", float64(lineItem.TotalMonetaryAmountOfLineItem) / 100)
+		s.LineItems[lineItemKey].PurchaseUnitPriceFormatted = fmt.Sprintf("%.4f", float64(lineItem.PurchaseUnitPrice)/100)
+		s.LineItems[lineItemKey].TotalMonetaryAmountOfLineItemFormatted = fmt.Sprintf("%.4f", float64(lineItem.TotalMonetaryAmountOfLineItem)/100)
 		totalQuantityOrdered += lineItem.QuantityOrdered
 		totalMonetaryValue += lineItem.PurchaseUnitPrice * lineItem.QuantityOrdered
 	}
@@ -145,7 +146,7 @@ func (s *Standard850V1) Prep(ctx context.Context) (error){
 	for otherChargeKey, otherCharge := range s.OtherCharges {
 		s.OtherCharges[otherChargeKey].OtherChargesRecord = "06"
 		s.OtherCharges[otherChargeKey].LineItemNumberForOtherCharges = otherChargeKey + 1 + 10
-		s.OtherCharges[otherChargeKey].OtherChargeAmountFormatted = fmt.Sprintf("%.4f", float64(otherCharge.OtherChargeAmount) / 100)
+		s.OtherCharges[otherChargeKey].OtherChargeAmountFormatted = fmt.Sprintf("%.4f", float64(otherCharge.OtherChargeAmount)/100)
 		totalMonetaryValueOfOtherCharges += otherCharge.OtherChargeAmount
 	}
 
@@ -166,27 +167,26 @@ func (s *Standard850V1) Prep(ctx context.Context) (error){
 	return nil
 }
 
-
-
-func (s *Standard850V1) ToBytes(ctx context.Context) (*[]byte, error){
+func (s *Standard850V1) ToBytes(ctx context.Context) (*[]byte, error) {
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-    w.Comma = '\t'
+	w.Comma = '\t'
 	enc := csvutil.NewEncoder(w)
+	enc.AutoHeader = false
 
 	// Prep
 	errPrep := s.Prep(ctx)
 	if errPrep != nil {
 		return nil, errPrep
 	}
-	
-	// Headerless
-	type header struct{}
-	errHeader := enc.EncodeHeader(header{})
-	if errHeader != nil {
-		return nil, errHeader
-	}
+
+	// // Headerless
+	// type header struct{}
+	// errHeader := enc.EncodeHeader(header{})
+	// if errHeader != nil {
+	// 	return nil, errHeader
+	// }
 
 	// Envelope Header
 	errEnvelopeHeaderV2 := enc.Encode(s.EnvelopeHeaderV2)
@@ -236,7 +236,7 @@ func (s *Standard850V1) ToBytes(ctx context.Context) (*[]byte, error){
 	return &byteArray, nil
 }
 
-func (s *Standard850V1) FromBytes(ctx context.Context, req []byte) (error){
+func (s *Standard850V1) FromBytes(ctx context.Context, req []byte) error {
 
 	r := csv.NewReader(bytes.NewReader(req))
 	r.Comma = '\t'
@@ -311,7 +311,7 @@ func (s *Standard850V1) FromBytes(ctx context.Context, req []byte) (error){
 			}
 			s.EnvelopeTrailerV2 = x
 		default:
-			
+
 		}
 
 	}
@@ -319,7 +319,7 @@ func (s *Standard850V1) FromBytes(ctx context.Context, req []byte) (error){
 	return nil
 }
 
-func (s *Standard850V1Transaction) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1Transaction) FromSlice(ctx context.Context, req []string) error {
 
 	if len(req) > 0 {
 		s.Header = req[0]
@@ -484,7 +484,7 @@ func (s *Standard850V1Transaction) FromSlice(ctx context.Context, req []string) 
 	return nil
 }
 
-func (s *Standard850V1LineItem) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1LineItem) FromSlice(ctx context.Context, req []string) error {
 
 	if len(req) > 0 {
 		s.DetailSectionLoopA = req[0]
@@ -528,7 +528,7 @@ func (s *Standard850V1LineItem) FromSlice(ctx context.Context, req []string) (er
 			if err != nil {
 				return err
 			}
-			s.PurchaseUnitPrice = int((purchaseUnitPriceFloat * float64(100) + 0.5))
+			s.PurchaseUnitPrice = int((purchaseUnitPriceFloat*float64(100) + 0.5))
 		}
 	}
 	if len(req) > 9 {
@@ -537,15 +537,15 @@ func (s *Standard850V1LineItem) FromSlice(ctx context.Context, req []string) (er
 			if err != nil {
 				return err
 			}
-			s.TotalMonetaryAmountOfLineItem = int((totalMonetaryAmountOfLineItemFloat * float64(100) + 0.5))
+			s.TotalMonetaryAmountOfLineItem = int((totalMonetaryAmountOfLineItemFloat*float64(100) + 0.5))
 		}
-		
+
 	}
 
 	return nil
 }
 
-func (s *Standard850V1OtherCharge) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1OtherCharge) FromSlice(ctx context.Context, req []string) error {
 
 	if len(req) > 0 {
 		s.OtherChargesRecord = req[0]
@@ -568,14 +568,14 @@ func (s *Standard850V1OtherCharge) FromSlice(ctx context.Context, req []string) 
 			if err != nil {
 				return err
 			}
-			s.OtherChargeAmount = int((otherChargeAmountFloat * float64(100) + 0.5))
+			s.OtherChargeAmount = int((otherChargeAmountFloat*float64(100) + 0.5))
 		}
-		
+
 	}
 	return nil
 }
 
-func (s *Standard850V1Trailer) FromSlice(ctx context.Context, req []string) (error){
+func (s *Standard850V1Trailer) FromSlice(ctx context.Context, req []string) error {
 
 	if len(req) > 0 {
 		s.TrailerRecord = req[0]
@@ -606,7 +606,7 @@ func (s *Standard850V1Trailer) FromSlice(ctx context.Context, req []string) (err
 	// 		}
 	// 		s.TotalMonetaryValue = int((totalMonetaryValueFloat * float64(100) + 0.5))
 	// 	}
-		
+
 	// }
 	// if len(req) > 4 {
 	// 	if req[4] != "" {
@@ -616,7 +616,7 @@ func (s *Standard850V1Trailer) FromSlice(ctx context.Context, req []string) (err
 	// 		}
 	// 		s.TotalMonetaryValueOfOtherCharges = int((totalMonetaryValueOfOtherChargesFloat * float64(100) + 0.5))
 	// 	}
-		
+
 	// }
 	// if len(req) > 5 {
 	// 	if req[5] != "" {
@@ -635,7 +635,7 @@ func (s *Standard850V1Trailer) FromSlice(ctx context.Context, req []string) (err
 	// 		}
 	// 		s.PurchaseOrderTotalAmount = int((purchaseOrderTotalAmountFloat * float64(100) + 0.5))
 	// 	}
-		
+
 	// }
 
 	return nil
