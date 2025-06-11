@@ -16,7 +16,14 @@ type Standard846V3 struct {
 	Header            Standard846V3TransactionHeader
 	LineItems         []Standard846V3LineItem
 	Trailer           Standard846V3TransactionTrailer
+	Sections          []Standard846V3Section
 	EnvelopeTrailerV3 EnvelopeTrailerV3
+}
+
+type Standard846V3Section struct {
+	Header    Standard846V3TransactionHeader
+	LineItems []Standard846V3LineItem
+	Trailer   Standard846V3TransactionTrailer
 }
 
 type Standard846V3TransactionHeader struct {
@@ -81,6 +88,9 @@ func (s *Standard846V3) FromBytes(ctx context.Context, req []byte) error {
 		return errDecoder
 	}
 
+	// Section
+	var section Standard846V3Section
+
 	for {
 		var v struct{}
 		if err := dec.Decode(&v); err == io.EOF {
@@ -110,6 +120,7 @@ func (s *Standard846V3) FromBytes(ctx context.Context, req []byte) error {
 				return err
 			}
 			s.Header = x
+			section.Header = x
 		case "02":
 			var x Standard846V3LineItem
 			err := x.FromSlice(ctx, record)
@@ -117,6 +128,7 @@ func (s *Standard846V3) FromBytes(ctx context.Context, req []byte) error {
 				return err
 			}
 			s.LineItems = append(s.LineItems, x)
+			section.LineItems = append(section.LineItems, x)
 		case "09":
 			var x Standard846V3TransactionTrailer
 			err := x.FromSlice(ctx, record)
@@ -124,6 +136,14 @@ func (s *Standard846V3) FromBytes(ctx context.Context, req []byte) error {
 				return err
 			}
 			s.Trailer = x
+			section.Trailer = x
+
+			// Append Section
+			s.Sections = append(s.Sections, section)
+
+			// Reset Section
+			section = Standard846V3Section{}
+
 		case "EASX":
 			var x EnvelopeTrailerV3
 			err := x.FromSlice(ctx, record)

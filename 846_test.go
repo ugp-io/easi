@@ -2,8 +2,6 @@ package easi
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -23,7 +21,7 @@ func TestStandard846V3FromBytes(t *testing.T) {
 	err := standard846V3.FromBytes(ctx, bytes)
 	assert.Nil(t, err)
 
-	c, _ := json.Marshal(standard846V3)
-	fmt.Println(string(c))
+	// c, _ := json.Marshal(standard846V3)
+	// fmt.Println(string(c))
 
 }
