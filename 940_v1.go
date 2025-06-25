@@ -13,12 +13,12 @@ import (
 )
 
 type Standard940V1 struct {
-	EnvelopeHeaderV2  EnvelopeHeaderV2
+	EnvelopeHeaderV3  EnvelopeHeaderV3
 	Transaction       Standard940V1Transaction
 	LineItems         []Standard940V1LineItem
 	OtherCharges      []Standard940V1OtherCharge
 	Trailer           Standard940V1Trailer
-	EnvelopeTrailerV2 EnvelopeTrailerV2
+	EnvelopeTrailerV3 EnvelopeTrailerV3
 }
 
 type Standard940V1Transaction struct {
@@ -117,11 +117,11 @@ type Standard940V1Trailer struct {
 func (s *Standard940V1) Prep(ctx context.Context) error {
 
 	// Header
-	errHeader := s.EnvelopeHeaderV2.Prep(ctx)
+	errHeader := s.EnvelopeHeaderV3.Prep(ctx)
 	if errHeader != nil {
 		return errHeader
 	}
-	s.EnvelopeHeaderV2.TransactionType = "940"
+	s.EnvelopeHeaderV3.TransactionType = "940"
 
 	// Transaction
 	s.Transaction.Header = "01"
@@ -159,7 +159,7 @@ func (s *Standard940V1) Prep(ctx context.Context) error {
 	// s.Trailer.PurchaseOrderTotalAmountFormatted = fmt.Sprintf("%.4f", float64(totalMonetaryValue + totalMonetaryValueOfOtherCharges) / 100)
 
 	// Trailer
-	errTrailer := s.EnvelopeTrailerV2.Prep(ctx)
+	errTrailer := s.EnvelopeTrailerV3.Prep(ctx)
 	if errTrailer != nil {
 		return errTrailer
 	}
@@ -189,9 +189,9 @@ func (s *Standard940V1) ToBytes(ctx context.Context) (*[]byte, error) {
 	// }
 
 	// Envelope Header
-	errEnvelopeHeaderV2 := enc.Encode(s.EnvelopeHeaderV2)
-	if errEnvelopeHeaderV2 != nil {
-		return nil, errEnvelopeHeaderV2
+	errEnvelopeHeaderV3 := enc.Encode(s.EnvelopeHeaderV3)
+	if errEnvelopeHeaderV3 != nil {
+		return nil, errEnvelopeHeaderV3
 	}
 
 	// Transaction
@@ -221,9 +221,9 @@ func (s *Standard940V1) ToBytes(ctx context.Context) (*[]byte, error) {
 	}
 
 	// Envelope Trailer
-	errEnvelopeTrailerV2V2 := enc.Encode(s.EnvelopeTrailerV2)
-	if errEnvelopeTrailerV2V2 != nil {
-		return nil, errEnvelopeTrailerV2V2
+	errEnvelopeTrailerV3V2 := enc.Encode(s.EnvelopeTrailerV3)
+	if errEnvelopeTrailerV3V2 != nil {
+		return nil, errEnvelopeTrailerV3V2
 	}
 
 	w.Flush()
@@ -269,12 +269,12 @@ func (s *Standard940V1) FromBytes(ctx context.Context, req []byte) error {
 		// Build
 		switch lineType {
 		case "EASI":
-			var x EnvelopeHeaderV2
+			var x EnvelopeHeaderV3
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
-			s.EnvelopeHeaderV2 = x
+			s.EnvelopeHeaderV3 = x
 		case "01":
 			var x Standard940V1Transaction
 			err := x.FromSlice(ctx, record)
@@ -304,12 +304,12 @@ func (s *Standard940V1) FromBytes(ctx context.Context, req []byte) error {
 			}
 			s.Trailer = x
 		case "EASX":
-			var x EnvelopeTrailerV2
+			var x EnvelopeTrailerV3
 			err := x.FromSlice(ctx, record)
 			if err != nil {
 				return err
 			}
-			s.EnvelopeTrailerV2 = x
+			s.EnvelopeTrailerV3 = x
 		default:
 
 		}
