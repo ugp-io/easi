@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,16 +13,16 @@ import (
 	"github.com/jszwec/csvutil"
 )
 
-type Standard940v4 struct {
+type Standard940V4 struct {
 	EnvelopeHeaderV3  EnvelopeHeaderV3
-	Transaction       Standard940v4Transaction
-	LineItems         []Standard940v4LineItem
-	OtherCharges      []Standard940v4OtherCharge
-	Trailer           Standard940v4Trailer
+	Transaction       Standard940V4Transaction
+	LineItems         []Standard940V4LineItem
+	OtherCharges      []Standard940V4OtherCharge
+	Trailer           Standard940V4Trailer
 	EnvelopeTrailerV3 EnvelopeTrailerV3
 }
 
-type Standard940v4Transaction struct {
+type Standard940V4Transaction struct {
 	Header                                     string
 	TransactionType                            string
 	TransactionSetPurpose                      string
@@ -77,7 +76,7 @@ type Standard940v4Transaction struct {
 	PromotionalCode                            string
 }
 
-type Standard940v4LineItem struct {
+type Standard940V4LineItem struct {
 	LineItemRecord                         string
 	LineItemNumber                         int
 	GTIN                                   string
@@ -92,7 +91,7 @@ type Standard940v4LineItem struct {
 	TotalMonetaryAmountOfLineItemFormatted string
 }
 
-type Standard940v4OtherCharge struct {
+type Standard940V4OtherCharge struct {
 	OtherChargeRecord             string
 	LineItemNumberForOtherCharges int
 	OtherChargeDescription        string
@@ -100,7 +99,7 @@ type Standard940v4OtherCharge struct {
 	OtherChargeAmountFormatted    string
 }
 
-type Standard940v4Trailer struct {
+type Standard940V4Trailer struct {
 	TrailerRecord        string
 	RecordCount          int
 	TotalQuantityOrdered int
@@ -108,7 +107,7 @@ type Standard940v4Trailer struct {
 	TotalAmountOfPO      string
 }
 
-func (s *Standard940v4) Prep(ctx context.Context) error {
+func (s *Standard940V4) Prep(ctx context.Context) error {
 
 	// Header
 	errHeader := s.EnvelopeHeaderV3.Prep(ctx)
@@ -163,7 +162,7 @@ func (s *Standard940v4) Prep(ctx context.Context) error {
 	return nil
 }
 
-func (s *Standard940v4) ToBytes(ctx context.Context) (*[]byte, error) {
+func (s *Standard940V4) ToBytes(ctx context.Context) (*[]byte, error) {
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
@@ -176,7 +175,7 @@ func (s *Standard940v4) ToBytes(ctx context.Context) (*[]byte, error) {
 		return nil, errPrep
 	}
 
-	if err := s.ValidateStandard940v4(ctx); err != nil {
+	if err := s.ValidateStandard940V4(ctx); err != nil {
 		return nil, err
 	}
 
@@ -232,15 +231,12 @@ func (s *Standard940v4) ToBytes(ctx context.Context) (*[]byte, error) {
 		return nil, err
 	}
 
-	bolB, _ := json.Marshal(s)
-	fmt.Println(string(bolB))
-
 	byteArray := buf.Bytes()
 
 	return &byteArray, nil
 }
 
-func (s *Standard940v4) FromBytes(ctx context.Context, req []byte) error {
+func (s *Standard940V4) FromBytes(ctx context.Context, req []byte) error {
 
 	r := csv.NewReader(bytes.NewReader(req))
 	r.Comma = '\t'
@@ -266,7 +262,6 @@ func (s *Standard940v4) FromBytes(ctx context.Context, req []byte) error {
 		// Record
 
 		record := dec.Record()
-		fmt.Println("Record:", record)
 		if len(record) > 0 {
 			// Build
 			switch record[0] {
@@ -276,39 +271,34 @@ func (s *Standard940v4) FromBytes(ctx context.Context, req []byte) error {
 				if err != nil {
 					return err
 				}
-				fmt.Println()
 				s.EnvelopeHeaderV3 = x
 			case "01":
-				var x Standard940v4Transaction
+				var x Standard940V4Transaction
 				err := x.ConvertFromFile(ctx, record)
 				if err != nil {
 					return err
 				}
-				fmt.Println()
 				s.Transaction = x
 			case "02":
-				var x Standard940v4LineItem
+				var x Standard940V4LineItem
 				err := x.ConvertFromFile(ctx, record)
 				if err != nil {
 					return err
 				}
-				fmt.Println()
 				s.LineItems = append(s.LineItems, x)
 			case "06":
-				var x Standard940v4OtherCharge
+				var x Standard940V4OtherCharge
 				err := x.ConvertFromFile(ctx, record)
 				if err != nil {
 					return err
 				}
-				fmt.Println()
 				s.OtherCharges = append(s.OtherCharges, x)
 			case "09":
-				var x Standard940v4Trailer
+				var x Standard940V4Trailer
 				err := x.ConvertFromFile(ctx, record)
 				if err != nil {
 					return err
 				}
-				fmt.Println()
 				s.Trailer = x
 			case "EASX":
 				var x EnvelopeTrailerV3
@@ -316,7 +306,6 @@ func (s *Standard940v4) FromBytes(ctx context.Context, req []byte) error {
 				if err != nil {
 					return err
 				}
-				fmt.Println()
 				s.EnvelopeTrailerV3 = x
 			}
 		}
@@ -325,7 +314,7 @@ func (s *Standard940v4) FromBytes(ctx context.Context, req []byte) error {
 	return nil
 }
 
-func (s *Standard940v4Transaction) ConvertFromFile(ctx context.Context, transactions []string) error {
+func (s *Standard940V4Transaction) ConvertFromFile(ctx context.Context, transactions []string) error {
 	for transactionIndex, transactionValue := range transactions {
 		switch transactionIndex {
 		case 0:
@@ -437,7 +426,7 @@ func (s *Standard940v4Transaction) ConvertFromFile(ctx context.Context, transact
 	return nil
 }
 
-func (s *Standard940v4LineItem) ConvertFromFile(ctx context.Context, lineItems []string) error {
+func (s *Standard940V4LineItem) ConvertFromFile(ctx context.Context, lineItems []string) error {
 	for indexLineItem, valLineItem := range lineItems {
 		switch indexLineItem {
 		case 0:
@@ -469,7 +458,7 @@ func (s *Standard940v4LineItem) ConvertFromFile(ctx context.Context, lineItems [
 	return nil
 }
 
-func (s *Standard940v4OtherCharge) ConvertFromFile(ctx context.Context, otherCharges []string) error {
+func (s *Standard940V4OtherCharge) ConvertFromFile(ctx context.Context, otherCharges []string) error {
 	for indexOtherCharge, valOtherCharge := range otherCharges {
 		switch indexOtherCharge {
 		case 0:
@@ -487,7 +476,7 @@ func (s *Standard940v4OtherCharge) ConvertFromFile(ctx context.Context, otherCha
 	return nil
 }
 
-func (s *Standard940v4Trailer) ConvertFromFile(ctx context.Context, trailers []string) error {
+func (s *Standard940V4Trailer) ConvertFromFile(ctx context.Context, trailers []string) error {
 	for indexTrailer, valTrailer := range trailers {
 		switch indexTrailer {
 		case 0:
@@ -508,7 +497,7 @@ func (s *Standard940v4Trailer) ConvertFromFile(ctx context.Context, trailers []s
 	return nil
 }
 
-func (s *Standard940v4) ValidateStandard940v4(ctx context.Context) error {
+func (s *Standard940V4) ValidateStandard940V4(ctx context.Context) error {
 
 	var errs []error
 	transaction := s.Transaction
@@ -667,10 +656,6 @@ func (s *Standard940v4) ValidateStandard940v4(ctx context.Context) error {
 			if otherCharge.LineItemNumberForOtherCharges <= 0 {
 				errs = append(errs, fmt.Errorf("Line Item Number For Other Charges is required"))
 			}
-
-			fmt.Println()
-			fmt.Println(otherCharge.OtherChargeAmount)
-			fmt.Println()
 
 			if otherCharge.OtherChargeAmount == 0 {
 				errs = append(errs, fmt.Errorf("Other Charge Amount is required"))
