@@ -643,7 +643,7 @@ func (s *Standard940V4) ValidateStandard940V4(ctx context.Context) error {
 	}
 
 	if len(otherCharges) <= 0 {
-		errs = append(errs, fmt.Errorf("Other Charges are required"))
+		// errs = append(errs, fmt.Errorf("Other Charges are required"))
 	} else {
 		for _, otherCharge := range otherCharges {
 
