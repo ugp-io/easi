@@ -119,7 +119,7 @@ func (s *Standard940V4) Prep(ctx context.Context) error {
 	// Transaction
 	s.Transaction.Header = "01"
 	s.Transaction.TransactionType = "940"
-	s.Transaction.VersionNumber = "4.1"
+	s.Transaction.VersionNumber = "4.0"
 	s.Transaction.TransactionSetPurpose = "00"
 	s.Transaction.PurchaseOrderDate = time.Now().Format("20060102")
 
