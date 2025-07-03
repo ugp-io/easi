@@ -180,11 +180,11 @@ func (s *Standard940V4) ToBytes(ctx context.Context) (*[]byte, error) {
 	}
 
 	// Headerless
-	type header struct{}
-	errHeader := enc.EncodeHeader(header{})
-	if errHeader != nil {
-		return nil, errHeader
-	}
+	// type header struct{}
+	// errHeader := enc.EncodeHeader(header{})
+	// if errHeader != nil {
+	// 	return nil, errHeader
+	// }
 
 	// Envelope Header)
 	errEnvelopeHeaderV3 := enc.Encode(s.EnvelopeHeaderV3)
