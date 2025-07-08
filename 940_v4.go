@@ -168,6 +168,7 @@ func (s *Standard940V4) ToBytes(ctx context.Context) (*[]byte, error) {
 	w := csv.NewWriter(&buf)
 	w.Comma = '\t'
 	enc := csvutil.NewEncoder(w)
+	enc.AutoHeader = true
 
 	// Prep
 	errPrep := s.Prep(ctx)
@@ -177,13 +178,6 @@ func (s *Standard940V4) ToBytes(ctx context.Context) (*[]byte, error) {
 
 	if err := s.ValidateStandard940V4(ctx); err != nil {
 		return nil, err
-	}
-
-	// Headerless
-	type header struct{}
-	errHeader := enc.EncodeHeader(header{})
-	if errHeader != nil {
-		return nil, errHeader
 	}
 
 	// Envelope Header)
