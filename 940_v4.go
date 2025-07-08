@@ -168,7 +168,7 @@ func (s *Standard940V4) ToBytes(ctx context.Context) (*[]byte, error) {
 	w := csv.NewWriter(&buf)
 	w.Comma = '\t'
 	enc := csvutil.NewEncoder(w)
-	enc.AutoHeader = true
+	enc.AutoHeader = false
 
 	// Prep
 	errPrep := s.Prep(ctx)

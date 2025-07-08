@@ -11,13 +11,13 @@ import (
 )
 
 var (
-	standard940v4 = Standard940v4{
+	standard940v4 = Standard940V4{
 		EnvelopeHeaderV3: EnvelopeHeaderV3{
 			InterchangeID: "202102268484912",
 			ReceiverID:    "123456789",
 			SenderID:      "383601069",
 		},
-		Transaction: Standard940v4Transaction{
+		Transaction: Standard940V4Transaction{
 			TransactionSetPurpose: "00",
 			PurchaseOrderTypeCode: "SA",
 			PurchaseOrderNumber:   "12345678",
@@ -43,7 +43,7 @@ var (
 			DeliverToCommercialOrResidentialSite: "C",
 			CODTagsIndicator:                     "N",
 		},
-		LineItems: []Standard940v4LineItem{
+		LineItems: []Standard940V4LineItem{
 			{
 				GTIN:                          "00821780002660",
 				MasterStyle:                   "2002",
@@ -65,7 +65,7 @@ var (
 				TotalMonetaryAmountOfLineItem: 2220,
 			},
 		},
-		OtherCharges: []Standard940v4OtherCharge{
+		OtherCharges: []Standard940V4OtherCharge{
 			{
 				OtherChargeDescription: "Shipping and Handling",
 				OtherChargeAmount:      200,
@@ -105,7 +105,7 @@ func TestConvertFromFile(t *testing.T) {
 		assert.Nil(t, readErr)
 	}
 
-	var standard940v4 Standard940v4
+	var standard940v4 Standard940V4
 	err := standard940v4.FromBytes(ctx, bytes)
 	intB, _ := json.Marshal(standard940v4)
 	fmt.Println(string(intB))
